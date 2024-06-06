@@ -1,2 +1,31 @@
-| eval trace_id=if(match(_raw, "traceId=(?<trace_id>\w+)"), mvindex(split(_raw, "traceId="), 1), null)
-| eval trace_id=mvindex(split(trace_id, " "), 0)
+Version Control for Database Schema:
+
+Liquibase allows you to track and manage database schema changes in a version-controlled manner, just like you do with your application code. This ensures that changes are auditable, reversible, and consistent across environments.
+Separation of Concerns:
+
+Keeping database schema changes separate from application code promotes a clean and organized codebase. It makes it easier to understand, maintain, and troubleshoot both your application and database schema.
+Collaboration:
+
+Liquibase enables multiple team members to work on database changes concurrently without conflicts. Each developer can work on their own changesets, and Liquibase handles merging them seamlessly.
+Automated Deployment:
+
+With Liquibase integrated into your CI/CD pipeline, you can automate the deployment of database changes alongside your application code. This streamlines the deployment process, reduces manual errors, and ensures consistency across environments.
+Rollback Capabilities:
+
+Liquibase provides built-in support for rolling back database changes in case of errors or issues during deployment. This gives you peace of mind knowing that you can revert to a previous state if needed.
+Cross-Database Compatibility:
+
+Liquibase is database agnostic, meaning you can use it with various database systems (e.g., MySQL, PostgreSQL, Oracle). This allows you to manage schema changes consistently across different database platforms.
+Data Migrations:
+
+In addition to schema changes, Liquibase supports data migrations, allowing you to manage and version your data alongside your schema. This is useful for populating initial data, migrating data between versions, or updating existing data.
+Validation and Testing:
+
+Liquibase provides tools for validating database changes before deployment. You can run pre-checks to ensure that changesets are valid and won't cause issues when applied. Additionally, you can write automated tests to validate the state of the database after applying changes.
+Auditing and Compliance:
+
+By maintaining a history of all database changes, Liquibase enables auditing and compliance requirements to be met more easily. You can track who made changes, when they were made, and why, which is essential for regulatory compliance and security.
+Community Support and Ecosystem:
+
+Liquibase has a vibrant community and ecosystem, with extensive documentation, tutorials, and plugins available. This makes it easy to get started and leverage additional functionality as needed.
+By using Liquibase, you can ensure that your database schema changes are managed effectively, reliably, and transparently, ultimately leading to a more robust and maintainable application.
