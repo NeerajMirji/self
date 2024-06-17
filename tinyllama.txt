@@ -1,52 +1,12 @@
-package com.example.splunksearch;
-
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.ByteArrayInputStream;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-@SpringBootApplication
-public class SplunkSearchApplication {
-
-    private static final Logger LOGGER = Logger.getLogger(SplunkSearchApplication.class.getName());
-
-    public static void main(String[] args) {
-        SpringApplication.run(SplunkSearchApplication.class, args);
-    }
-
-    @Bean
-    public CommandLineRunner run() {
-        return args -> {
-            String baseUrl = "https://localhost:8089";
-            String username = "<username>";
-            String password = "<password>";
-            RestTemplate restTemplate = new RestTemplate();
-
-            try {
-                // Step 1: Get a session key
-                HttpHeaders headers = new HttpHeaders();
+HttpHeaders headers = new HttpHeaders();
                 MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
                 body.add("username", username);
                 body.add("password", password);
                 HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
                 ResponseEntity<String> response = restTemplate.postForEntity(baseUrl + "/services/auth/login", request, String.class);
-                String sessionKey = extractValueFromXml(response.getBody(), "sessionKey");
+                JSONObject jsonResponse = new JSONObject(response.getBody());
+                String sessionKey = jsonResponse.getJSONObject("response").getString("sessionKey");
                 LOGGER.info("====>sessionkey: " + sessionKey + " <====");
 
                 // Step 2: Create a search job
@@ -61,7 +21,8 @@ public class SplunkSearchApplication {
                 request = new HttpEntity<>(body, headers);
 
                 response = restTemplate.postForEntity(baseUrl + "/services/search/jobs", request, String.class);
-                String sid = extractValueFromXml(response.getBody(), "sid");
+                jsonResponse = new JSONObject(response.getBody());
+                String sid = jsonResponse.getString("sid");
                 LOGGER.info("====>sid: " + sid + " <====");
 
                 // Step 3: Get the search status
@@ -69,7 +30,8 @@ public class SplunkSearchApplication {
                 boolean isNotDone = true;
                 while (isNotDone) {
                     ResponseEntity<String> statusResponse = restTemplate.exchange(baseUrl + servicesSearchStatusStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-                    String isDoneStatus = extractValueFromXml(statusResponse.getBody(), "isDone");
+                    jsonResponse = new JSONObject(statusResponse.getBody());
+                    String isDoneStatus = jsonResponse.getJSONObject("entry").getJSONArray("content").getJSONObject(0).getString("isDone");
                     if ("1".equals(isDoneStatus)) {
                         isNotDone = false;
                     } else {
@@ -86,18 +48,3 @@ public class SplunkSearchApplication {
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error occurred: ", e);
             }
-        };
-    }
-
-    private String extractValueFromXml(String xml, String tagName) throws Exception {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder builder = factory.newDocumentBuilder();
-        Document doc = builder.parse(new ByteArrayInputStream(xml.getBytes()));
-        NodeList nodeList = doc.getElementsByTagName(tagName);
-        if (nodeList != null && nodeList.getLength() > 0) {
-            return nodeList.item(0).getTextContent();
-        } else {
-            throw new Exception("Tag " + tagName + " not found in the XML response");
-        }
-    }
-}
