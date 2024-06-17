@@ -1,21 +1,131 @@
-private String extractValueFromXml(String xml, String keyName) throws Exception {
-    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    factory.setNamespaceAware(true); // Enable namespace awareness
-    DocumentBuilder builder = factory.newDocumentBuilder();
-    Document doc = builder.parse(new InputSource(new StringReader(xml)));
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
-    // Define namespace URI
-    String namespaceURI = "http://dev.splunk.com/ns/rest";
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-    // Find elements with the given keyName and namespace URI
-    NodeList nodeList = doc.getElementsByTagNameNS(namespaceURI, "key");
-    for (int i = 0; i < nodeList.getLength(); i++) {
-        Element element = (Element) nodeList.item(i);
-        String nameAttribute = element.getAttribute("name");
-        if (nameAttribute != null && nameAttribute.equals(keyName)) {
-            return element.getTextContent();
-        }
+@SpringBootApplication
+public class SplunkSearchApplication {
+
+    private static final Logger LOGGER = Logger.getLogger(SplunkSearchApplication.class.getName());
+
+    public static void main(String[] args) {
+        SpringApplication.run(SplunkSearchApplication.class, args);
     }
 
-    throw new Exception("Tag " + keyName + " not found in the XML response");
+    @Bean
+    public CommandLineRunner run() {
+        return args -> {
+            String baseUrl = "https://localhost:8089";
+            String username = "<username>";
+            String password = "<password>";
+            RestTemplate restTemplate = new RestTemplate();
+
+            try {
+                // Step 1: Get a session key
+                HttpHeaders headers = new HttpHeaders();
+                MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+                body.add("username", username);
+                body.add("password", password);
+                HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+
+                ResponseEntity<String> response = restTemplate.postForEntity(baseUrl + "/services/auth/login", request, String.class);
+                String sessionKey = extractValueFromXml(response.getBody(), "sessionKey");
+                LOGGER.info("====>sessionkey: " + sessionKey + " <====");
+
+                // Step 2: Create a search job
+                String searchQuery = "index=\"_internal\" | head 10";
+                if (!searchQuery.startsWith("search")) {
+                    searchQuery = "search " + searchQuery;
+                }
+
+                headers.set("Authorization", "Splunk " + sessionKey);
+                body = new LinkedMultiValueMap<>();
+                body.add("search", searchQuery);
+                request = new HttpEntity<>(body, headers);
+
+                response = restTemplate.postForEntity(baseUrl + "/services/search/jobs", request, String.class);
+                String sid = extractValueFromXml(response.getBody(), "sid");
+                LOGGER.info("====>sid: " + sid + " <====");
+
+                // Step 3: Get the search status
+                String servicesSearchStatusStr = "/services/search/jobs/" + sid;
+                boolean isNotDone = true;
+                while (isNotDone) {
+                    ResponseEntity<String> statusResponse = restTemplate.exchange(baseUrl + servicesSearchStatusStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+                    String isDoneStatus = extractValueFromXml(statusResponse.getBody(), "isDone");
+                    if ("1".equals(isDoneStatus)) {
+                        isNotDone = false;
+                    } else {
+                        Thread.sleep(1000); // Wait before checking again
+                    }
+                }
+                LOGGER.info("====>search status: 1 <====");
+
+                // Step 4: Get the search results
+                String servicesSearchResultsStr = "/services/search/jobs/" + sid + "/results?output_mode=json&count=0";
+                ResponseEntity<String> resultsResponse = restTemplate.exchange(baseUrl + servicesSearchResultsStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+                LOGGER.info("====>search result: [" + resultsResponse.getBody() + "] <====");
+
+                // Parse the JSON response to get the timestamp
+                JSONObject jsonResponse = new JSONObject(resultsResponse.getBody());
+                JSONArray results = jsonResponse.getJSONArray("results");
+                for (int i = 0; i < results.length(); i++) {
+                    JSONObject result = results.getJSONObject(i);
+                    String raw = result.getString("_raw");
+                    String timestamp = extractTimestampFromRaw(raw);
+                    LOGGER.info("====>timestamp: " + timestamp + " <====");
+                }
+
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error occurred: ", e);
+            }
+        };
+    }
+
+    private String extractValueFromXml(String xml, String tagName) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true); // Enable namespace awareness
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(new InputSource(new StringReader(xml)));
+
+        if ("updated".equals(tagName)) {
+            // Special handling for the updated tag which is not in the s: namespace
+            NodeList nodeList = doc.getElementsByTagName(tagName);
+            if (nodeList != null && nodeList.getLength() > 0) {
+                return nodeList.item(0).getTextContent();
+            }
+        } else {
+            // For elements in the s: namespace
+            String namespaceURI = "http://dev.splunk.com/ns/rest";
+            NodeList nodeList = doc.getElementsByTagNameNS(namespaceURI, "key");
+            for (int i = 0; i < nodeList.getLength(); i++) {
+                Element element = (Element) nodeList.item(i);
+                String nameAttribute = element.getAttribute("name");
+                if (nameAttribute != null && nameAttribute.equals(tagName)) {
+                    return element.getTextContent();
+                }
+            }
+        }
+
+        throw new Exception("Tag " + tagName + " not found in the XML response");
+    }
+
+    private String extractTimestampFromRaw(String raw) {
+        // Assuming the raw field contains the timestamp in a known format
+        // Example raw format: "2024-06-17T08:51:11.604+00:00 Some log message"
+        String timestamp = raw.split(" ")[0]; // Split by space and take the first part
+        return timestamp;
+    }
 }
