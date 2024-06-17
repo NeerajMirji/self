@@ -16,9 +16,14 @@ import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @SpringBootApplication
 public class SplunkSearchApplication {
+
+    private static final Logger LOGGER = Logger.getLogger(SplunkSearchApplication.class.getName());
 
     public static void main(String[] args) {
         SpringApplication.run(SplunkSearchApplication.class, args);
@@ -32,46 +37,55 @@ public class SplunkSearchApplication {
             String password = "<password>";
             RestTemplate restTemplate = new RestTemplate();
 
-            // Step 1: Get a session key
-            HttpHeaders headers = new HttpHeaders();
-            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-            body.add("username", username);
-            body.add("password", password);
-            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+            try {
+                // Step 1: Get a session key
+                HttpHeaders headers = new HttpHeaders();
+                MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+                body.add("username", username);
+                body.add("password", password);
+                HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
-            ResponseEntity<String> response = restTemplate.postForEntity(baseUrl + "/services/auth/login", request, String.class);
-            String sessionKey = extractValueFromXml(response.getBody(), "sessionKey");
-            System.out.println("====>sessionkey: " + sessionKey + " <====");
+                ResponseEntity<String> response = restTemplate.postForEntity(baseUrl + "/services/auth/login", request, String.class);
+                String sessionKey = extractValueFromXml(response.getBody(), "sessionKey");
+                LOGGER.info("====>sessionkey: " + sessionKey + " <====");
 
-            // Step 2: Create a search job
-            String searchQuery = "index=\"_internal\" | head 10";
-            if (!searchQuery.startsWith("search")) {
-                searchQuery = "search " + searchQuery;
+                // Step 2: Create a search job
+                String searchQuery = "index=\"_internal\" | head 10";
+                if (!searchQuery.startsWith("search")) {
+                    searchQuery = "search " + searchQuery;
+                }
+
+                headers.set("Authorization", "Splunk " + sessionKey);
+                body = new LinkedMultiValueMap<>();
+                body.add("search", searchQuery);
+                request = new HttpEntity<>(body, headers);
+
+                response = restTemplate.postForEntity(baseUrl + "/services/search/jobs", request, String.class);
+                String sid = extractValueFromXml(response.getBody(), "sid");
+                LOGGER.info("====>sid: " + sid + " <====");
+
+                // Step 3: Get the search status
+                String servicesSearchStatusStr = "/services/search/jobs/" + sid;
+                boolean isNotDone = true;
+                while (isNotDone) {
+                    ResponseEntity<String> statusResponse = restTemplate.exchange(baseUrl + servicesSearchStatusStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+                    String isDoneStatus = extractValueFromXml(statusResponse.getBody(), "isDone");
+                    if ("1".equals(isDoneStatus)) {
+                        isNotDone = false;
+                    } else {
+                        Thread.sleep(1000); // Wait before checking again
+                    }
+                }
+                LOGGER.info("====>search status: 1 <====");
+
+                // Step 4: Get the search results
+                String servicesSearchResultsStr = "/services/search/jobs/" + sid + "/results?output_mode=json&count=0";
+                ResponseEntity<String> resultsResponse = restTemplate.exchange(baseUrl + servicesSearchResultsStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+                LOGGER.info("====>search result: [" + resultsResponse.getBody() + "] <====");
+
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error occurred: ", e);
             }
-
-            headers.set("Authorization", "Splunk " + sessionKey);
-            body = new LinkedMultiValueMap<>();
-            body.add("search", searchQuery);
-            request = new HttpEntity<>(body, headers);
-
-            response = restTemplate.postForEntity(baseUrl + "/services/search/jobs", request, String.class);
-            String sid = extractValueFromXml(response.getBody(), "sid");
-            System.out.println("====>sid: " + sid + " <====");
-
-            // Step 3: Get the search status
-            String servicesSearchStatusStr = "/services/search/jobs/" + sid;
-            boolean isNotDone = true;
-            while (isNotDone) {
-                ResponseEntity<String> statusResponse = restTemplate.exchange(baseUrl + servicesSearchStatusStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-                String isDoneStatus = extractValueFromXml(statusResponse.getBody(), "isDone");
-                isNotDone = !"1".equals(isDoneStatus);
-            }
-            System.out.println("====>search status: 1 <====");
-
-            // Step 4: Get the search results
-            String servicesSearchResultsStr = "/services/search/jobs/" + sid + "/results?output_mode=json&count=0";
-            ResponseEntity<String> resultsResponse = restTemplate.exchange(baseUrl + servicesSearchResultsStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-            System.out.println("====>search result: [" + resultsResponse.getBody() + "] <====");
         };
     }
 
@@ -80,6 +94,10 @@ public class SplunkSearchApplication {
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = builder.parse(new ByteArrayInputStream(xml.getBytes()));
         NodeList nodeList = doc.getElementsByTagName(tagName);
-        return nodeList.item(0).getTextContent();
+        if (nodeList != null && nodeList.getLength() > 0) {
+            return nodeList.item(0).getTextContent();
+        } else {
+            throw new Exception("Tag " + tagName + " not found in the XML response");
+        }
     }
 }
