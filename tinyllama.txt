@@ -1,50 +1,21 @@
-HttpHeaders headers = new HttpHeaders();
-                MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-                body.add("username", username);
-                body.add("password", password);
-                HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+private String extractValueFromXml(String xml, String keyName) throws Exception {
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setNamespaceAware(true); // Enable namespace awareness
+    DocumentBuilder builder = factory.newDocumentBuilder();
+    Document doc = builder.parse(new InputSource(new StringReader(xml)));
 
-                ResponseEntity<String> response = restTemplate.postForEntity(baseUrl + "/services/auth/login", request, String.class);
-                JSONObject jsonResponse = new JSONObject(response.getBody());
-                String sessionKey = jsonResponse.getJSONObject("response").getString("sessionKey");
-                LOGGER.info("====>sessionkey: " + sessionKey + " <====");
+    // Define namespace URI
+    String namespaceURI = "http://dev.splunk.com/ns/rest";
 
-                // Step 2: Create a search job
-                String searchQuery = "index=\"_internal\" | head 10";
-                if (!searchQuery.startsWith("search")) {
-                    searchQuery = "search " + searchQuery;
-                }
+    // Find elements with the given keyName and namespace URI
+    NodeList nodeList = doc.getElementsByTagNameNS(namespaceURI, "key");
+    for (int i = 0; i < nodeList.getLength(); i++) {
+        Element element = (Element) nodeList.item(i);
+        String nameAttribute = element.getAttribute("name");
+        if (nameAttribute != null && nameAttribute.equals(keyName)) {
+            return element.getTextContent();
+        }
+    }
 
-                headers.set("Authorization", "Splunk " + sessionKey);
-                body = new LinkedMultiValueMap<>();
-                body.add("search", searchQuery);
-                request = new HttpEntity<>(body, headers);
-
-                response = restTemplate.postForEntity(baseUrl + "/services/search/jobs", request, String.class);
-                jsonResponse = new JSONObject(response.getBody());
-                String sid = jsonResponse.getString("sid");
-                LOGGER.info("====>sid: " + sid + " <====");
-
-                // Step 3: Get the search status
-                String servicesSearchStatusStr = "/services/search/jobs/" + sid;
-                boolean isNotDone = true;
-                while (isNotDone) {
-                    ResponseEntity<String> statusResponse = restTemplate.exchange(baseUrl + servicesSearchStatusStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-                    jsonResponse = new JSONObject(statusResponse.getBody());
-                    String isDoneStatus = jsonResponse.getJSONObject("entry").getJSONArray("content").getJSONObject(0).getString("isDone");
-                    if ("1".equals(isDoneStatus)) {
-                        isNotDone = false;
-                    } else {
-                        Thread.sleep(1000); // Wait before checking again
-                    }
-                }
-                LOGGER.info("====>search status: 1 <====");
-
-                // Step 4: Get the search results
-                String servicesSearchResultsStr = "/services/search/jobs/" + sid + "/results?output_mode=json&count=0";
-                ResponseEntity<String> resultsResponse = restTemplate.exchange(baseUrl + servicesSearchResultsStr, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-                LOGGER.info("====>search result: [" + resultsResponse.getBody() + "] <====");
-
-            } catch (Exception e) {
-                LOGGER.log(Level.SEVERE, "Error occurred: ", e);
-            }
+    throw new Exception("Tag " + keyName + " not found in the XML response");
+}
