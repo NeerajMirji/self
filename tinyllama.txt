@@ -1,31 +1,24 @@
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.TopicPartition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 @Service
 public class KafkaOffsetService {
 
-    @Autowired
-    private AdminClient adminClient;
+    private static final Logger logger = LoggerFactory.getLogger(KafkaOffsetService.class);
 
     @Autowired
     private KafkaConsumer<String, String> kafkaConsumer;
 
-    public Map<TopicPartition, Long> getEndOffsetsForTimestamp(String topic, String consumerGroup, long timestamp) throws ExecutionException, InterruptedException {
-        // Get current consumer group offsets
-        ListConsumerGroupOffsetsResult result = adminClient.listConsumerGroupOffsets(consumerGroup);
-        Map<TopicPartition, OffsetAndMetadata> offsets = result.partitionsToOffsetAndMetadata().get();
-
+    public Map<TopicPartition, Long> getEndOffsetsForTimestamp(String topic, long timestamp) {
         Map<TopicPartition, Long> endOffsets = new HashMap<>();
         kafkaConsumer.partitionsFor(topic).forEach(partitionInfo -> {
             TopicPartition partition = new TopicPartition(partitionInfo.topic(), partitionInfo.partition());
@@ -38,13 +31,16 @@ public class KafkaOffsetService {
             Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes = kafkaConsumer.offsetsForTimes(timestampsToSearch);
 
             OffsetAndTimestamp offsetAndTimestamp = offsetsForTimes.get(partition);
+            long offsetToUse;
             if (offsetAndTimestamp != null && offsetAndTimestamp.offset() <= endOffset) {
-                endOffsets.put(partition, offsetAndTimestamp.offset());
+                offsetToUse = offsetAndTimestamp.offset();
             } else {
-                endOffsets.put(partition, endOffset);
+                offsetToUse = endOffset;
             }
-        });
 
+            endOffsets.put(partition, offsetToUse);
+            logger.info("Partition: {}, Timestamp: {}, Offset: {}", partition.partition(), timestamp, offsetToUse);
+        });
         return endOffsets;
     }
 }
