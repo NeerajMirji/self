@@ -1,5 +1,6 @@
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,7 @@ public class KafkaOffsetService {
 
     public Map<TopicPartition, Long> getEndOffsetsForTimestamp(String topic, long timestamp) {
         Map<TopicPartition, Long> endOffsets = new HashMap<>();
-        kafkaConsumer.partitionsFor(topic).forEach(partitionInfo -> {
+        for (PartitionInfo partitionInfo : kafkaConsumer.partitionsFor(topic)) {
             TopicPartition partition = new TopicPartition(partitionInfo.topic(), partitionInfo.partition());
             kafkaConsumer.assign(Collections.singletonList(partition));
             kafkaConsumer.seekToEnd(Collections.singletonList(partition));
@@ -40,7 +41,7 @@ public class KafkaOffsetService {
 
             endOffsets.put(partition, offsetToUse);
             logger.info("Partition: {}, Timestamp: {}, Offset: {}", partition.partition(), timestamp, offsetToUse);
-        });
+        }
         return endOffsets;
     }
 }
