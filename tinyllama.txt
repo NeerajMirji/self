@@ -1,37 +1,50 @@
-# actions.py
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
+import org.apache.kafka.common.TopicPartition;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
-from typing import Any, Text, Dict, List
-from rasa_sdk import Action, Tracker
-from rasa_sdk.executor import CollectingDispatcher
-import requests
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
-class ActionFetchReport(Action):
-    def name(self) -> Text:
-        return "action_fetch_report"
+@Service
+public class KafkaOffsetService {
 
-    def run(self, dispatcher: CollectingDispatcher,
-            tracker: Tracker, domain: Dict[Text, Any]) -> List[Dict[Text, Any]]:
+    @Autowired
+    private AdminClient adminClient;
 
-        # Example: Get CompanyId from slot
-        company_id = tracker.get_slot("CompanyId")
+    @Autowired
+    private KafkaConsumer<String, String> kafkaConsumer;
 
-        # Make API call to fetch report
-        api_url = f"https://api.example.com/reports/{company_id}"
-        headers = {"Authorization": "Bearer YOUR_API_TOKEN"}  # Replace with your API token
+    public Map<TopicPartition, Long> getEndOffsetsForTimestamp(String topic, String consumerGroup, long timestamp) throws ExecutionException, InterruptedException {
+        // Get current consumer group offsets
+        ListConsumerGroupOffsetsResult result = adminClient.listConsumerGroupOffsets(consumerGroup);
+        Map<TopicPartition, OffsetAndMetadata> offsets = result.partitionsToOffsetAndMetadata().get();
 
-        try:
-            response = requests.get(api_url, headers=headers)
-            if response.status_code == 200:
-                report_data = response.json()
+        Map<TopicPartition, Long> endOffsets = new HashMap<>();
+        kafkaConsumer.partitionsFor(topic).forEach(partitionInfo -> {
+            TopicPartition partition = new TopicPartition(partitionInfo.topic(), partitionInfo.partition());
+            kafkaConsumer.assign(Collections.singletonList(partition));
+            kafkaConsumer.seekToEnd(Collections.singletonList(partition));
+            long endOffset = kafkaConsumer.position(partition);
 
-                # Example: Send report data as a message
-                dispatcher.utter_message(text=f"Here is the report for Company ID {company_id}:")
-                for item in report_data:
-                    dispatcher.utter_message(text=f"{item['date']} - {item['amount']}")
-            else:
-                dispatcher.utter_message(text="Failed to fetch report. Please try again later.")
+            Map<TopicPartition, Long> timestampsToSearch = new HashMap<>();
+            timestampsToSearch.put(partition, timestamp);
+            Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes = kafkaConsumer.offsetsForTimes(timestampsToSearch);
 
-        except requests.exceptions.RequestException as e:
-            dispatcher.utter_message(text=f"Failed to fetch report: {str(e)}")
+            OffsetAndTimestamp offsetAndTimestamp = offsetsForTimes.get(partition);
+            if (offsetAndTimestamp != null && offsetAndTimestamp.offset() <= endOffset) {
+                endOffsets.put(partition, offsetAndTimestamp.offset());
+            } else {
+                endOffsets.put(partition, endOffset);
+            }
+        });
 
-        return []
+        return endOffsets;
+    }
+}
