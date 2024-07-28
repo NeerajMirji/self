@@ -6,15 +6,15 @@ from datetime import datetime, timezone
 BASE_URL = "http://localhost:8080/events"
 
 def get_event_count(start, end):
-    response = requests.get(f"{BASE_URL}/count", params={"start": start.isoformat(), "end": end.isoformat()})
+    response = requests.post(f"{BASE_URL}/count", json={"start": start.isoformat(), "end": end.isoformat()})
     return response.json()
 
 def get_unconsumed_events(start, end):
-    response = requests.get(f"{BASE_URL}/unconsumed", params={"start": start.isoformat(), "end": end.isoformat()})
+    response = requests.post(f"{BASE_URL}/unconsumed", json={"start": start.isoformat(), "end": end.isoformat()})
     return response.json()
 
 def get_event_status(event_id):
-    response = requests.get(f"{BASE_URL}/status/{event_id}")
+    response = requests.post(f"{BASE_URL}/status", json={"eventId": event_id})
     return response.json()
 
 st.title("Event Monitoring Dashboard")
@@ -26,15 +26,23 @@ feature = st.sidebar.radio("Go to", ("Search by Date and Time", "Search by Event
 if feature == "Search by Date and Time":
     st.header("Search by Date and Time")
 
-    start_datetime = st.sidebar.datetime_input("Start date and time", value=datetime.now())
-    end_datetime = st.sidebar.datetime_input("End date and time", value=datetime.now())
+    start_datetime = st.sidebar.date_input("Start date and time", value=datetime.now())
+    start_time = st.sidebar.time_input("Start time", value=datetime.now().time())
+    end_datetime = st.sidebar.date_input("End date and time", value=datetime.now())
+    end_time = st.sidebar.time_input("End time", value=datetime.now().time())
+    
+    start = datetime.combine(start_datetime, start_time).replace(tzinfo=timezone.utc)
+    end = datetime.combine(end_datetime, end_time).replace(tzinfo=timezone.utc)
 
     if st.sidebar.button("Get Event Counts"):
-        start = start_datetime.replace(tzinfo=timezone.utc)
-        end = end_datetime.replace(tzinfo=timezone.utc)
         event_counts = get_event_count(start, end)
-        st.write(f"Produced by ODS: {event_counts['producedCount']}")
-        st.write(f"Consumed by IRWS: {event_counts['consumedCount']}")
+        with st.container():
+            st.subheader("Event Counts")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(label="Produced by ODS", value=event_counts['producedCount'])
+            with col2:
+                st.metric(label="Consumed by IRWS", value=event_counts['consumedCount'])
 
         if event_counts['producedCount'] != event_counts['consumedCount']:
             st.warning("Mismatch detected! See unconsumed events below.")
@@ -49,6 +57,7 @@ elif feature == "Search by Event ID":
 
     if st.sidebar.button("Get Event Status"):
         event_status = get_event_status(event_id)
+        st.subheader("Event Status")
         st.write(f"Event ID: {event_status['evtId']}")
         st.write(f"Producer Timestamp: {event_status['producerTimestamp']}")
         st.write(f"Consumer Timestamp: {event_status['consumerTimestamp']}")
