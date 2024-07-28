@@ -26,14 +26,12 @@ feature = st.sidebar.radio("Go to", ("Search by Date and Time", "Search by Event
 if feature == "Search by Date and Time":
     st.header("Search by Date and Time")
 
-    start_datetime = st.sidebar.date_input("Start date", value=datetime.now().date())
-    start_time = st.sidebar.time_input("Start time", value=datetime.now().time())
-    end_datetime = st.sidebar.date_input("End date", value=datetime.now().date())
-    end_time = st.sidebar.time_input("End time", value=datetime.now().time())
+    start_datetime = st.sidebar.datetime_input("Start date and time", value=datetime.now())
+    end_datetime = st.sidebar.datetime_input("End date and time", value=datetime.now())
 
     if st.sidebar.button("Get Event Counts"):
-        start = datetime.combine(start_datetime, start_time).replace(tzinfo=timezone.utc)
-        end = datetime.combine(end_datetime, end_time).replace(tzinfo=timezone.utc)
+        start = start_datetime.replace(tzinfo=timezone.utc)
+        end = end_datetime.replace(tzinfo=timezone.utc)
         event_counts = get_event_count(start, end)
         st.write(f"Produced by ODS: {event_counts['producedCount']}")
         st.write(f"Consumed by IRWS: {event_counts['consumedCount']}")
