@@ -1,8 +1,29 @@
 # streamlit_app.py
 import streamlit as st
 import requests
+import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
+
+# Function to create a hierarchical graph
+def create_hierarchical_graph(event_data):
+    G = nx.DiGraph()
+
+    # Add nodes and edges based on the event data
+    for flow in event_data['eventFlow']:
+        publisher = flow['publisherApp']
+        G.add_node(publisher, label=publisher, color='green')
+
+        for consumer in flow['publishedTo']:
+            consumer_app = consumer['consumerApp']
+            status = consumer['status']
+            color = 'green' if status == 'SUCCESS' else 'red'
+            G.add_node(consumer_app, label=consumer_app, color=color)
+            G.add_edge(publisher, consumer_app, color=color)
+
+    # Create a hierarchical layout
+    pos = nx.spring_layout(G, seed=42)  # you can experiment with different layouts like spring_layout, shell_layout, etc.
+    return G, pos
 
 # Set up the Streamlit sidebar
 st.sidebar.title("Event Status Visualization")
@@ -13,21 +34,19 @@ if st.sidebar.button("Get Event Status"):
         response = requests.get(f"http://localhost:5000/events/{event_id}")
         if response.status_code == 200:
             event_data = response.json()
-            
+
+            # Create the graph
+            G, pos = create_hierarchical_graph(event_data)
+
             # Create a Network object
             net = Network(height='600px', width='100%', bgcolor='#222222', font_color='white')
 
-            # Add nodes and edges based on the event data
-            for flow in event_data['eventFlow']:
-                publisher = flow['publisherApp']
-                net.add_node(publisher, label=publisher, color='green')
+            # Add nodes and edges to the Network object
+            for node, data in G.nodes(data=True):
+                net.add_node(node, label=data['label'], color=data['color'])
 
-                for consumer in flow['publishedTo']:
-                    consumer_app = consumer['consumerApp']
-                    status = consumer['status']
-                    color = 'green' if status == 'SUCCESS' else 'red'
-                    net.add_node(consumer_app, label=consumer_app, color=color)
-                    net.add_edge(publisher, consumer_app, color=color)
+            for source, target, data in G.edges(data=True):
+                net.add_edge(source, target, color=data['color'])
 
             # Generate the HTML file
             net.save_graph('event_status_graph.html')
