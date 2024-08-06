@@ -1,107 +1,42 @@
+# streamlit_app.py
 import streamlit as st
 import requests
-from datetime import datetime, timezone
+from pyvis.network import Network
+import streamlit.components.v1 as components
 
-# Base URL of the Spring Boot backend
-BASE_URL = "http://localhost:8080/events"
+# Set up the Streamlit sidebar
+st.sidebar.title("Event Status Visualization")
+event_id = st.sidebar.text_input("Enter Event ID:")
 
-def get_event_count(start, end):
-    response = requests.post(f"{BASE_URL}/count", json={"start": start.isoformat(), "end": end.isoformat()})
-    return response.json()
+if st.sidebar.button("Get Event Status"):
+    if event_id:
+        response = requests.get(f"http://localhost:5000/events/{event_id}")
+        if response.status_code == 200:
+            event_data = response.json()
+            
+            # Create a Network object
+            net = Network(height='600px', width='100%', bgcolor='#222222', font_color='white')
 
-def get_unconsumed_events(start, end):
-    response = requests.post(f"{BASE_URL}/unconsumed", json={"start": start.isoformat(), "end": end.isoformat()})
-    return response.json()
+            # Add nodes and edges based on the event data
+            for flow in event_data['eventFlow']:
+                publisher = flow['publisherApp']
+                net.add_node(publisher, label=publisher, color='green')
 
-def get_event_status(event_id):
-    response = requests.post(f"{BASE_URL}/status", json={"eventId": event_id})
-    return response.json()
+                for consumer in flow['publishedTo']:
+                    consumer_app = consumer['consumerApp']
+                    status = consumer['status']
+                    color = 'green' if status == 'SUCCESS' else 'red'
+                    net.add_node(consumer_app, label=consumer_app, color=color)
+                    net.add_edge(publisher, consumer_app, color=color)
 
-# Custom CSS for dark theme and boxed containers
-st.markdown("""
-    <style>
-        .reportview-container {
-            background-color: #1e1e1e;
-            color: white;
-        }
-        .sidebar .sidebar-content {
-            background-color: #333;
-        }
-        .stButton>button {
-            background-color: #555;
-            color: white;
-        }
-        .stTextInput>div>div>input {
-            background-color: #444;
-            color: white;
-        }
-        .box {
-            padding: 10px;
-            margin: 10px 0;
-            border: 2px solid #555;
-            border-radius: 10px;
-            background-color: #222;
-        }
-        .box-header {
-            font-size: 20px;
-            margin-bottom: 10px;
-        }
-        .box-content {
-            font-size: 16px;
-        }
-    </style>
-""", unsafe_allow_html=True)
+            # Generate the HTML file
+            net.save_graph('event_status_graph.html')
 
-st.title("Event Monitoring Dashboard")
-
-# Sidebar for toggling between features
-st.sidebar.title("Navigation")
-feature = st.sidebar.radio("Go to", ("Search by Date and Time", "Search by Event ID"))
-
-if feature == "Search by Date and Time":
-    st.header("Search by Date and Time")
-
-    start_datetime = st.sidebar.date_input("Start date", value=datetime.now())
-    start_time = st.sidebar.time_input("Start time", value=datetime.now().time())
-    end_datetime = st.sidebar.date_input("End date", value=datetime.now())
-    end_time = st.sidebar.time_input("End time", value=datetime.now().time())
-    
-    start = datetime.combine(start_datetime, start_time).replace(tzinfo=timezone.utc)
-    end = datetime.combine(end_datetime, end_time).replace(tzinfo=timezone.utc)
-
-    if st.sidebar.button("Get Event Counts"):
-        event_counts = get_event_count(start, end)
-        
-        st.markdown('<div class="box">', unsafe_allow_html=True)
-        st.markdown('<div class="box-header">Event Counts</div>', unsafe_allow_html=True)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown('<div class="box-content">Produced by ODS</div>', unsafe_allow_html=True)
-            st.metric(label="", value=event_counts['producedCount'])
-        with col2:
-            st.markdown('<div class="box-content">Consumed by IRWS</div>', unsafe_allow_html=True)
-            st.metric(label="", value=event_counts['consumedCount'])
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        if event_counts['producedCount'] != event_counts['consumedCount']:
-            st.warning("Mismatch detected! See unconsumed events below.")
-            unconsumed_events = get_unconsumed_events(start, end)
-            st.write("Unconsumed Events:")
-            st.table(unconsumed_events)  # Displaying the unconsumed events in a table format
-
-elif feature == "Search by Event ID":
-    st.header("Search by Event ID")
-    event_id = st.sidebar.text_input("Event ID")
-
-    if st.sidebar.button("Get Event Status"):
-        event_status = get_event_status(event_id)
-        
-        st.markdown('<div class="box">', unsafe_allow_html=True)
-        st.markdown('<div class="box-header">Event Status</div>', unsafe_allow_html=True)
-        st.markdown('<div class="box-content">', unsafe_allow_html=True)
-        st.write(f"Event ID: {event_status['evtId']}")
-        st.write(f"Producer Timestamp: {event_status['producerTimestamp']}")
-        st.write(f"Consumer Timestamp: {event_status['consumerTimestamp']}")
-        st.write(f"Status: {event_status['status']}")
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            # Display the graph
+            HtmlFile = open('event_status_graph.html', 'r', encoding='utf-8')
+            source_code = HtmlFile.read()
+            components.html(source_code, height=700, width=1000)
+        else:
+            st.error("Event not found")
+    else:
+        st.error("Please enter a valid Event ID")
