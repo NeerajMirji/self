@@ -1,0 +1,30 @@
+{
+    "producers": {
+        "ODS": {
+            "producedCount": 100,
+            "consumedBy": {
+                "IRWS": {
+                    "consumedCount": 95,
+                    "discrepancies": ["event1", "event2"]
+                },
+                "AnotherConsumer": {
+                    "consumedCount": 98,
+                    "discrepancies": []
+                }
+            }
+        },
+        "AnotherProducer": {
+            "producedCount": 80,
+            "consumedBy": {
+                "SomeConsumer": {
+                    "consumedCount": 75,
+                    "discrepancies": ["event3"]
+                },
+                "AnotherConsumer": {
+                    "consumedCount": 77,
+                    "discrepancies": []
+                }
+            }
+        }
+    }
+}
