@@ -4,9 +4,8 @@ import requests
 import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
-import pydot
 
-# Function to create a hierarchical graph using pydot for layout
+# Function to create a hierarchical graph with manual layout adjustment
 def create_hierarchical_graph(event_data):
     G = nx.DiGraph()
 
@@ -24,10 +23,22 @@ def create_hierarchical_graph(event_data):
             G.add_node(consumer_app, label=consumer_app, title=f"Consumed at: {consumer_time}", color=color)
             G.add_edge(publisher, consumer_app, color=color, title=f"Status: {status}")
 
-    # Create a hierarchical layout using pydot
-    dot = nx.nx_pydot.to_pydot(G)
-    dot.set('rankdir', 'TB')  # top to bottom
-    pos = nx.nx_pydot.pydot_layout(G, prog='dot')
+    # Create a custom hierarchical layout
+    pos = nx.spring_layout(G, seed=42)  # Initial layout
+    layers = {}
+    for node in nx.topological_sort(G):
+        layer = len(nx.ancestors(G, node))
+        if layer not in layers:
+            layers[layer] = []
+        layers[layer].append(node)
+
+    # Adjust positions for a hierarchical structure
+    y_gap = 100  # vertical gap between layers
+    x_gap = 200  # horizontal gap between nodes
+    for i, layer in enumerate(sorted(layers.keys())):
+        for j, node in enumerate(layers[layer]):
+            pos[node] = (j * x_gap, -i * y_gap)
+    
     return G, pos
 
 # Set up the Streamlit sidebar
