@@ -12,18 +12,6 @@ def get_event_count(start, end):
     response = requests.post(url, json=payload)
     return response.json()
 
-# Helper function to get unconsumed events (assuming this API exists)
-def get_unconsumed_events(start, end, producer, consumer):
-    url = "http://localhost:5000/events/unconsumed"
-    payload = {
-        "start_date": start.isoformat(),
-        "end_date": end.isoformat(),
-        "producer": producer,
-        "consumer": consumer
-    }
-    response = requests.post(url, json=payload)
-    return response.json()
-
 # Set up the Streamlit sidebar
 st.sidebar.title("Event Status Visualization")
 
@@ -40,17 +28,18 @@ if st.button("Get Event Counts"):
     event_counts = get_event_count(start, end)
 
     st.write("## Event Counts")
+    
     for producer, counts in event_counts['producers'].items():
-        st.write(f"### Produced by {producer}: {counts['producedCount']}")
+        st.write(f"### Produced by {producer}")
+        st.markdown(f"<div style='padding: 10px; background-color: lightgray; border-radius: 5px;'><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
+        
         for consumer, details in counts['consumedBy'].items():
-            st.write(f"Consumed by {consumer}: {details['consumedCount']}")
+            st.markdown(f"<div style='padding: 10px; background-color: lightblue; border-radius: 5px;'><b>Consumed by {consumer}:</b> {details['consumedCount']}</div>", unsafe_allow_html=True)
+            
             if details['discrepancies']:
-                st.warning(f"Mismatch detected for consumer {consumer}! Click the link below to view unconsumed events.")
-                if st.button(f"View unconsumed events for {consumer}"):
-                    unconsumed_events = get_unconsumed_events(start, end, producer, consumer)
-                    st.write(f"Unconsumed Events for {consumer}:")
-                    st.write(unconsumed_events)
+                st.warning(f"Mismatch detected for consumer {consumer}!")
+                st.write(f"Unconsumed Events for {consumer}: {details['discrepancies']}")
             else:
                 st.write(f"No discrepancies for consumer {consumer}")
 
-# Note: The get_unconsumed_events function assumes there is an API to fetch the list of unconsumed events for a given producer-consumer pair.
+# Note: The discrepancies are directly used from the event_counts payload and are not fetched from a separate API call.
