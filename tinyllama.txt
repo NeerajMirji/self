@@ -12,14 +12,22 @@ def create_hierarchical_graph(event_data):
     for flow in event_data['eventFlow']:
         publisher = flow['publisherApp']
         publisher_time = flow['publishedAt']
-        G.add_node(publisher, label=publisher, title=f"Published at: {publisher_time}", color='green')
+        if publisher in G.nodes:
+            # Append publisher time if node already exists
+            G.nodes[publisher]['title'] += f"\nPublished at: {publisher_time}"
+        else:
+            G.add_node(publisher, label=publisher, title=f"Published at: {publisher_time}", color='green')
 
         for consumer in flow['publishedTo']:
             consumer_app = consumer['consumerApp']
             consumer_time = consumer['consumedAt']
             status = consumer['status']
             color = 'green' if status == 'SUCCESS' else 'red'
-            G.add_node(consumer_app, label=consumer_app, title=f"Consumed at: {consumer_time}", color=color)
+            if consumer_app in G.nodes:
+                # Append consumer time if node already exists
+                G.nodes[consumer_app]['title'] += f"\nConsumed at: {consumer_time}"
+            else:
+                G.add_node(consumer_app, label=consumer_app, title=f"Consumed at: {consumer_time}", color=color)
             G.add_edge(publisher, consumer_app, color=color, title=f"Status: {status}")
 
     # Create a custom hierarchical layout
@@ -54,7 +62,7 @@ if st.sidebar.button("Get Event Status"):
             G, pos = create_hierarchical_graph(event_data)
 
             # Create a Network object
-            net = Network(height='600px', width='100%', bgcolor='white', font_color='black', directed=True)
+            net = Network(height='75vh', width='100%', bgcolor='white', font_color='black', directed=True)
 
             # Add nodes and edges to the Network object
             for node, data in G.nodes(data=True):
@@ -64,13 +72,13 @@ if st.sidebar.button("Get Event Status"):
                 net.add_edge(source, target, color=data['color'], title=data['title'])
 
             # Generate the HTML file
-            net.save_graph('event_status_graph.html')
+            net.show('event_status_graph.html')
 
             # Display the graph
             try:
                 HtmlFile = open('event_status_graph.html', 'r', encoding='utf-8')
                 source_code = HtmlFile.read()
-                components.html(source_code, height=700, width=1000)
+                components.html(source_code, height=700, width='100%')
             except FileNotFoundError:
                 st.error("Failed to generate the graph HTML file")
         else:
