@@ -4,7 +4,6 @@ from datetime import datetime
 
 # Helper function to get event counts
 def get_event_count(start, end):
-    # Replace with your actual API endpoint
     url = "http://localhost:5000/events/date-range"
     payload = {
         "start_date": start.isoformat(),
@@ -32,22 +31,32 @@ if st.button("Get Event Counts"):
     
     for producer, counts in event_counts['producers'].items():
         st.write(f"### Produced by {producer}")
-        
+
         # Creating columns for side-by-side display
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            st.markdown(f"<div style='padding: 10px; background-color: lightgray; border-radius: 5px;'><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
-        
+            st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px;'><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
+
         for consumer, details in counts['consumedBy'].items():
             with col2:
-                st.markdown(f"<div style='padding: 10px; background-color: lightblue; border-radius: 5px;'><b>Consumed by {consumer}:</b> {details['consumedCount']}</div>", unsafe_allow_html=True)
-            
+                consumer_box = f"""
+                <div style='padding: 20px; background-color: lightblue; border-radius: 5px;'>
+                    <h4 style='text-align: center;'>{consumer}</h4>
+                    <b>Consumed Count:</b> {details['consumedCount']}<br>
+                """
+                if details['discrepancies']:
+                    consumer_box += "<span style='color: red;'>Mismatch detected!</span>"
+                consumer_box += "</div>"
+                st.markdown(consumer_box, unsafe_allow_html=True)
+
             if details['discrepancies']:
-                st.warning(f"Mismatch detected for consumer {consumer}!")
                 if st.button(f"View unconsumed events for {consumer}", key=f"btn_{consumer}"):
                     st.session_state['discrepancies'] = details['discrepancies']
                     st.experimental_rerun()
+
+        # Add margin between rows
+        st.markdown("<br>", unsafe_allow_html=True)
 
 # Feature to display discrepancies
 if 'discrepancies' in st.session_state:
@@ -56,5 +65,3 @@ if 'discrepancies' in st.session_state:
     if st.button("Back"):
         del st.session_state['discrepancies']
         st.experimental_rerun()
-
-# Note: The discrepancies are directly used from the event_counts payload and are not fetched from a separate API call.
