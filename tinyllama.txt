@@ -1,87 +1,56 @@
 import streamlit as st
 import requests
-import networkx as nx
-from pyvis.network import Network
-import streamlit.components.v1 as components
+from datetime import datetime
 
-# Function to create a hierarchical graph with manual layout adjustment
-def create_hierarchical_graph(event_data):
-    G = nx.DiGraph()
+# Helper function to get event counts
+def get_event_count(start, end):
+    url = "http://localhost:5000/events/date-range"
+    payload = {
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat()
+    }
+    response = requests.post(url, json=payload)
+    return response.json()
 
-    # Add nodes and edges based on the event data
-    for flow in event_data['eventFlow']:
-        publisher = flow['publisherApp']
-        publisher_time = flow['publishedAt']
-        if publisher in G.nodes:
-            # Append publisher time if node already exists
-            G.nodes[publisher]['title'] += f"\nPublished at: {publisher_time}"
-        else:
-            G.add_node(publisher, label=publisher, title=f"Published at: {publisher_time}", color='green')
-
-        for consumer in flow['publishedTo']:
-            consumer_app = consumer['consumerApp']
-            consumer_time = consumer['consumedAt']
-            status = consumer['status']
-            color = 'green' if status == 'SUCCESS' else 'red'
-            if consumer_app in G.nodes:
-                # Append consumer time if node already exists
-                G.nodes[consumer_app]['title'] += f"\nConsumed at: {consumer_time}"
-            else:
-                G.add_node(consumer_app, label=consumer_app, title=f"Consumed at: {consumer_time}", color=color)
-            G.add_edge(publisher, consumer_app, color=color, title=f"Status: {status}")
-
-    # Create a custom hierarchical layout
-    pos = nx.spring_layout(G, seed=42)  # Initial layout
-    layers = {}
-    for node in nx.topological_sort(G):
-        layer = len(nx.ancestors(G, node))
-        if layer not in layers:
-            layers[layer] = []
-        layers[layer].append(node)
-
-    # Adjust positions for a hierarchical structure
-    y_gap = 100  # vertical gap between layers
-    x_gap = 200  # horizontal gap between nodes
-    for i, layer in enumerate(sorted(layers.keys())):
-        for j, node in enumerate(layers[layer]):
-            pos[node] = (j * x_gap, -i * y_gap)
-    
-    return G, pos
+# Helper function to get unconsumed events (assuming this API exists)
+def get_unconsumed_events(start, end, producer, consumer):
+    url = "http://localhost:5000/events/unconsumed"
+    payload = {
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "producer": producer,
+        "consumer": consumer
+    }
+    response = requests.post(url, json=payload)
+    return response.json()
 
 # Set up the Streamlit sidebar
 st.sidebar.title("Event Status Visualization")
-event_id = st.sidebar.text_input("Enter Event ID:")
 
-if st.sidebar.button("Get Event Status"):
-    if event_id:
-        response = requests.get(f"http://localhost:5000/events/{event_id}")
-        if response.status_code == 200:
-            event_data = response.json()
+# Feature 1: Search by Date and Time
+st.header("Search by Date and Time")
+start_date = st.date_input("Start date")
+start_time = st.time_input("Start time")
+end_date = st.date_input("End date")
+end_time = st.time_input("End time")
 
-            # Create the graph
-            G, pos = create_hierarchical_graph(event_data)
+if st.button("Get Event Counts"):
+    start = datetime.combine(start_date, start_time)
+    end = datetime.combine(end_date, end_time)
+    event_counts = get_event_count(start, end)
 
-            # Create a Network object
-            net = Network(height='75vh', width='100%', bgcolor='white', font_color='black', directed=True)
+    st.write("## Event Counts")
+    for producer, counts in event_counts['producers'].items():
+        st.write(f"### Produced by {producer}: {counts['producedCount']}")
+        for consumer, details in counts['consumedBy'].items():
+            st.write(f"Consumed by {consumer}: {details['consumedCount']}")
+            if details['discrepancies']:
+                st.warning(f"Mismatch detected for consumer {consumer}! Click the link below to view unconsumed events.")
+                if st.button(f"View unconsumed events for {consumer}"):
+                    unconsumed_events = get_unconsumed_events(start, end, producer, consumer)
+                    st.write(f"Unconsumed Events for {consumer}:")
+                    st.write(unconsumed_events)
+            else:
+                st.write(f"No discrepancies for consumer {consumer}")
 
-            # Add nodes and edges to the Network object
-            for node, data in G.nodes(data=True):
-                net.add_node(node, label=data['label'], title=data['title'], color=data['color'])
-
-            for source, target, data in G.edges(data=True):
-                net.add_edge(source, target, color=data['color'], title=data['title'])
-
-            # Generate the HTML file
-            net.show('event_status_graph.html')
-
-            # Display the graph
-            try:
-                HtmlFile = open('event_status_graph.html', 'r', encoding='utf-8')
-                source_code = HtmlFile.read()
-                components.html(source_code, height=700, width='100%')
-            except FileNotFoundError:
-                st.error("Failed to generate the graph HTML file")
-        else:
-            st.error("Event not found")
-    else:
-        st.error("Please enter a valid Event ID")
+# Note: The get_unconsumed_events function assumes there is an API to fetch the list of unconsumed events for a given producer-consumer pair.
