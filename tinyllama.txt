@@ -29,25 +29,31 @@ if st.button("Get Event Counts"):
 
     st.write("## Event Counts")
 
-    # Iterate through each producer and their consumers
-    for producer, counts in event_counts['producers'].items():
-        # Display producer box
-        st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px;'><b>Produced by {producer}</b><br><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
+    # Display the event counts in a two-column layout
+    count = 0
+    cols = st.columns(2)
 
-        # Display each consumer in a new line under the producer
-        for consumer, details in counts['consumedBy'].items():
-            consumer_box = f"""
-            <div style='padding: 20px; background-color: lightblue; border-radius: 5px; margin-bottom: 10px;'>
-                <h4 style='text-align: center;'>{consumer}</h4>
-                <b>Consumed Count:</b> {details['consumedCount']}<br>
-            """
-            if details['discrepancies']:
-                consumer_box += "<span style='color: red;'>Mismatch detected!</span><br>"
-                if st.button(f"View unconsumed events for {consumer}", key=f"btn_{consumer}"):
-                    st.session_state['discrepancies'] = details['discrepancies']
-                    st.experimental_rerun()
-            consumer_box += "</div>"
-            st.markdown(consumer_box, unsafe_allow_html=True)
+    for producer, counts in event_counts['producers'].items():
+        with cols[count % 2]:
+            # Display producer box
+            st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px;'><b>Produced by {producer}</b><br><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
+
+            # Display each consumer under the producer
+            for consumer, details in counts['consumedBy'].items():
+                consumer_box = f"""
+                <div style='padding: 20px; background-color: lightblue; border-radius: 5px; margin-top: 10px;'>
+                    <h4 style='text-align: center;'>{consumer}</h4>
+                    <b>Consumed Count:</b> {details['consumedCount']}<br>
+                """
+                if details['discrepancies']:
+                    consumer_box += "<span style='color: red;'>Mismatch detected!</span><br>"
+                    if st.button(f"View unconsumed events for {consumer}", key=f"btn_{consumer}"):
+                        st.session_state['discrepancies'] = details['discrepancies']
+                        st.experimental_rerun()
+                consumer_box += "</div>"
+                st.markdown(consumer_box, unsafe_allow_html=True)
+
+        count += 1
 
 # Feature to display discrepancies
 if 'discrepancies' in st.session_state:
