@@ -29,17 +29,20 @@ if st.button("Get Event Counts"):
 
     st.write("## Event Counts")
 
-    # Display event counts in a two-column layout
-    cols = st.columns(2)
-    col_index = 0
-
+    # Iterate through each producer and their consumers
     for producer, counts in event_counts['producers'].items():
-        with cols[col_index]:
-            # Display producer box
+        # Display producer box
+        cols = st.columns(2)
+        with cols[0]:
             st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px;'><b>Produced by {producer}</b><br><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
 
-            # Display each consumer under the producer
-            for consumer, details in counts['consumedBy'].items():
+        # Display each consumer in a new line under the producer
+        col_index = 1
+        for consumer, details in counts['consumedBy'].items():
+            if col_index == 2:
+                cols = st.columns(2)
+                col_index = 0
+            with cols[col_index]:
                 consumer_box = f"""
                 <div style='padding: 20px; background-color: lightblue; border-radius: 5px; margin-top: 10px;'>
                     <h4 style='text-align: center;'>{consumer}</h4>
@@ -52,10 +55,7 @@ if st.button("Get Event Counts"):
                         st.experimental_rerun()
                 consumer_box += "</div>"
                 st.markdown(consumer_box, unsafe_allow_html=True)
-
-        col_index = (col_index + 1) % 2
-        if col_index == 0:
-            cols = st.columns(2)  # Create a new row with two columns
+            col_index += 1
 
 # Feature to display discrepancies
 if 'discrepancies' in st.session_state:
