@@ -1,4 +1,3 @@
-# streamlit_app.py
 import streamlit as st
 import requests
 import networkx as nx
@@ -65,12 +64,15 @@ if st.sidebar.button("Get Event Status"):
                 net.add_edge(source, target, color=data['color'], title=data['title'])
 
             # Generate the HTML file
-            net.show('event_status_graph.html')
+            net.save_graph('event_status_graph.html')
 
             # Display the graph
-            HtmlFile = open('event_status_graph.html', 'r', encoding='utf-8')
-            source_code = HtmlFile.read()
-            components.html(source_code, height=700, width=1000)
+            try:
+                HtmlFile = open('event_status_graph.html', 'r', encoding='utf-8')
+                source_code = HtmlFile.read()
+                components.html(source_code, height=700, width=1000)
+            except FileNotFoundError:
+                st.error("Failed to generate the graph HTML file")
         else:
             st.error("Event not found")
     else:
