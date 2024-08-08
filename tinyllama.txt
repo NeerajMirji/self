@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 from datetime import datetime
-from urllib.parse import urlencode
 
 # Helper function to get event counts
 def get_event_count(start, end):
@@ -13,7 +12,7 @@ def get_event_count(start, end):
     response = requests.post(url, json=payload)
     return response.json()
 
-# Initialize session state
+# Initialize session state for navigation
 if 'view' not in st.session_state:
     st.session_state.view = 'main'
 if 'discrepancies' not in st.session_state:
@@ -23,13 +22,12 @@ if 'producer' not in st.session_state:
 if 'consumer' not in st.session_state:
     st.session_state.consumer = ''
 
-# Function to switch to discrepancies view
+# Function to show discrepancies view
 def show_discrepancies(producer, consumer, discrepancies):
     st.session_state.view = 'discrepancies'
     st.session_state.producer = producer
     st.session_state.consumer = consumer
     st.session_state.discrepancies = discrepancies
-    st.experimental_rerun()
 
 # Set up the Streamlit sidebar
 st.sidebar.title("Event Status Visualization")
@@ -47,7 +45,6 @@ if st.button("Get Event Counts"):
     event_counts = get_event_count(start, end)
     st.session_state.event_counts = event_counts
     st.session_state.view = 'main'
-    st.experimental_rerun()
 
 if st.session_state.view == 'main':
     if 'event_counts' in st.session_state:
@@ -72,24 +69,28 @@ if st.session_state.view == 'main':
                         <b>Consumed Count:</b> {details['consumedCount']}<br>
                     """
                     if details['discrepancies']:
-                        # Generate a link that updates the query parameters
-                        query_params = {"view": "discrepancies", "producer": producer, "consumer": consumer}
-                        link = f"?{urlencode(query_params)}"
-                        consumer_box += f"""<span style='color: red;'>Mismatch detected! </span><br><a href="{link}" style="color: blue; text-decoration: underline;">Check here</a><br>"""
+                        consumer_box += f"""<span style='color: red;'>Mismatch detected! </span><br>"""
+                        consumer_box += f"""<a href="#" onClick="window.show_discrepancies('{producer}', '{consumer}', {details['discrepancies']})" style="color: blue; text-decoration: underline;">Check here</a><br>"""
                     consumer_box += "</div>"
                     st.markdown(consumer_box, unsafe_allow_html=True)
                 col_index += 1
 
-# Check for query parameters to handle navigation
-params = st.query_params
-if params.get("view") == "discrepancies":
-    producer = params.get("producer", "")
-    consumer = params.get("consumer", "")
-    discrepancies = st.session_state.event_counts['producers'][producer]['consumedBy'][consumer]['discrepancies']
-    
-    st.header(f"Events not consumed by {consumer}")
-    st.table(discrepancies)
+    # Register JavaScript function to handle discrepancy display
+    st.markdown("""
+        <script>
+        window.show_discrepancies = function(producer, consumer, discrepancies) {
+            window.location.href = "#";
+            // Use Streamlit's Session State API to switch views
+            window.show_discrepancies_producer = producer;
+            window.show_discrepancies_consumer = consumer;
+            window.show_discrepancies_data = discrepancies;
+            Streamlit.setComponentValue({});
+        }
+        </script>
+    """, unsafe_allow_html=True)
+
+elif st.session_state.view == 'discrepancies':
+    st.header(f"Events not consumed by {st.session_state.consumer}")
+    st.table(st.session_state.discrepancies)
     if st.button("Back"):
-        # Clear the query params to go back to the main view
-        st.experimental_set_query_params()
-        st.experimental_rerun()
+        st.session_state.view = 'main'
