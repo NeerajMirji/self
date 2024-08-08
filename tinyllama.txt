@@ -17,6 +17,10 @@ if 'view' not in st.session_state:
     st.session_state.view = 'main'
 if 'discrepancies' not in st.session_state:
     st.session_state.discrepancies = []
+if 'producer' not in st.session_state:
+    st.session_state.producer = ''
+if 'consumer' not in st.session_state:
+    st.session_state.consumer = ''
 
 # Function to switch to discrepancies view
 def show_discrepancies(producer, consumer, discrepancies):
@@ -24,6 +28,7 @@ def show_discrepancies(producer, consumer, discrepancies):
     st.session_state.producer = producer
     st.session_state.consumer = consumer
     st.session_state.discrepancies = discrepancies
+    st.experimental_rerun()  # Force rerun to immediately reflect state change
 
 # Set up the Streamlit sidebar
 st.sidebar.title("Event Status Visualization")
@@ -41,6 +46,7 @@ if st.button("Get Event Counts"):
     event_counts = get_event_count(start, end)
     st.session_state.event_counts = event_counts
     st.session_state.view = 'main'
+    st.experimental_rerun()  # Force rerun to immediately reflect state change
 
 if st.session_state.view == 'main':
     if 'event_counts' in st.session_state:
@@ -65,7 +71,7 @@ if st.session_state.view == 'main':
                         <b>Consumed Count:</b> {details['consumedCount']}<br>
                     """
                     if details['discrepancies']:
-                        consumer_box += f"""<span style='color: red;'>Mismatch detected! <a href="#" onclick="window.location.search='?view=discrepancies&producer={producer}&consumer={consumer}'">Check here</a></span><br>"""
+                        consumer_box += f"""<span style='color: red;'>Mismatch detected! </span><br><button onclick="window.location.href='{st.experimental_set_query_params(view='discrepancies', producer=producer, consumer=consumer)}'">Check here</button><br>"""
                     consumer_box += "</div>"
                     st.markdown(consumer_box, unsafe_allow_html=True)
                     if details['discrepancies']:
