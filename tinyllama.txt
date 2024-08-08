@@ -26,6 +26,7 @@ if st.button("Get Event Counts"):
     start = datetime.combine(start_date, start_time)
     end = datetime.combine(end_date, end_time)
     event_counts = get_event_count(start, end)
+    st.session_state.event_counts = event_counts  # Store event counts in session state
 
     st.write("## Event Counts")
 
@@ -49,29 +50,19 @@ if st.button("Get Event Counts"):
                     <b>Consumed Count:</b> {details['consumedCount']}<br>
                 """
                 if details['discrepancies']:
-                    consumer_box += "<span style='color: red;'>Mismatch detected! <a href='#' onclick='fetch_discrepancies(\"{consumer}\")'>Check here</a></span><br>"
-                    if f"discrepancies_{consumer}" not in st.session_state:
-                        st.session_state[f"discrepancies_{consumer}"] = False
-
-                    def fetch_discrepancies(consumer_key):
-                        st.session_state[f"discrepancies_{consumer_key}"] = True
-                        st.experimental_rerun()
-
-                    if st.session_state[f"discrepancies_{consumer}"]:
-                        st.write("### Unconsumed Events")
-                        st.write(details['discrepancies'])
-                        if st.button("Back", key=f"back_{consumer}"):
-                            st.session_state[f"discrepancies_{consumer}"] = False
-                            st.experimental_rerun()
-
+                    consumer_box += f"""<span style='color: red;'>Mismatch detected! <a href="?page=discrepancies&producer={producer}&consumer={consumer}">Check here</a></span><br>"""
                 consumer_box += "</div>"
                 st.markdown(consumer_box, unsafe_allow_html=True)
             col_index += 1
 
 # Feature to display discrepancies
-if 'discrepancies' in st.session_state:
-    st.write("### Unconsumed Events")
-    st.write(st.session_state['discrepancies'])
-    if st.button("Back"):
-        del st.session_state['discrepancies']
-        st.experimental_rerun()
+if st.experimental_get_query_params().get("page") == ["discrepancies"]:
+    producer = st.experimental_get_query_params().get("producer", [None])[0]
+    consumer = st.experimental_get_query_params().get("consumer", [None])[0]
+    if producer and consumer and 'event_counts' in st.session_state:
+        discrepancies = st.session_state.event_counts['producers'][producer]['consumedBy'][consumer]['discrepancies']
+        st.header(f"Events not consumed by {consumer}")
+        st.table(discrepancies)
+        if st.button("Back"):
+            st.experimental_set_query_params()
+            st.experimental_rerun()
