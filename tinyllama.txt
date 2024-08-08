@@ -66,19 +66,22 @@ if st.session_state.view == 'main':
                     cols = st.columns(2)
                     col_index = 0
                 with cols[col_index]:
-                    consumer_box = f"""
-                    <div style='padding: 20px; background-color: lightblue; border-radius: 5px; width: 300px; height: 150px; margin-top: 10px;'>
-                        <h4 style='text-align: center;'>{consumer}</h4>
-                        <b>Consumed Count:</b> {details['consumedCount']}<br>
-                    """
-                    st.markdown(consumer_box, unsafe_allow_html=True)
-                    
-                    # Button inside the consumer box
-                    if details['discrepancies']:
-                        if st.button(f"Check discrepancies for {consumer}", key=f"{producer}_{consumer}"):
-                            show_discrepancies(producer, consumer, details['discrepancies'])
-                        
-                        st.markdown(f"<span style='color: red;'>Mismatch detected!</span>", unsafe_allow_html=True)
+                    # Container for the consumer box
+                    with st.container():
+                        st.markdown(f"""
+                        <div style='padding: 20px; background-color: lightblue; border-radius: 5px; width: 300px; height: auto;'>
+                            <h4 style='text-align: center;'>{consumer}</h4>
+                            <b>Consumed Count:</b> {details['consumedCount']}<br>
+                        """, unsafe_allow_html=True)
+
+                        # Button inside the consumer box
+                        if details['discrepancies']:
+                            st.markdown("<span style='color: red;'>Mismatch detected!</span>", unsafe_allow_html=True)
+                            if st.button(f"Check discrepancies for {consumer}", key=f"{producer}_{consumer}"):
+                                show_discrepancies(producer, consumer, details['discrepancies'])
+
+                        st.markdown("</div>", unsafe_allow_html=True)
+
                 col_index += 1
 
 elif st.session_state.view == 'discrepancies':
