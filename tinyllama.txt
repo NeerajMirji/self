@@ -71,17 +71,14 @@ if st.session_state.view == 'main':
                         <h4 style='text-align: center;'>{consumer}</h4>
                         <b>Consumed Count:</b> {details['consumedCount']}<br>
                     """
-                    if details['discrepancies']:
-                        # Updated to use st.query_params
-                        query_params = st.query_params
-                        query_params.update({"view": "discrepancies", "producer": producer, "consumer": consumer})
-                        url = f"?{urlencode(query_params)}"
-                        consumer_box += f"""<span style='color: red;'>Mismatch detected! </span><br><a href="{url}">Check here</a><br>"""
-                    consumer_box += "</div>"
                     st.markdown(consumer_box, unsafe_allow_html=True)
+                    
+                    # Button inside the consumer box
                     if details['discrepancies']:
                         if st.button(f"Check discrepancies for {consumer}", key=f"{producer}_{consumer}"):
                             show_discrepancies(producer, consumer, details['discrepancies'])
+                        
+                        st.markdown(f"<span style='color: red;'>Mismatch detected!</span>", unsafe_allow_html=True)
                 col_index += 1
 
 elif st.session_state.view == 'discrepancies':
