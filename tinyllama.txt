@@ -34,7 +34,7 @@ if st.button("Get Event Counts"):
         # Display producer box
         cols = st.columns(2)
         with cols[0]:
-            st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px;'><b>Produced by {producer}</b><br><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px; width: 300px; height: 150px;'><b>Produced by {producer}</b><br><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
 
         # Display each consumer in a new line under the producer
         col_index = 1
@@ -44,15 +44,26 @@ if st.button("Get Event Counts"):
                 col_index = 0
             with cols[col_index]:
                 consumer_box = f"""
-                <div style='padding: 20px; background-color: lightblue; border-radius: 5px; margin-top: 10px;'>
+                <div style='padding: 20px; background-color: lightblue; border-radius: 5px; width: 300px; height: 150px; margin-top: 10px;'>
                     <h4 style='text-align: center;'>{consumer}</h4>
                     <b>Consumed Count:</b> {details['consumedCount']}<br>
                 """
                 if details['discrepancies']:
-                    consumer_box += "<span style='color: red;'>Mismatch detected!</span><br>"
-                    if st.button(f"View unconsumed events for {consumer}", key=f"btn_{consumer}"):
-                        st.session_state['discrepancies'] = details['discrepancies']
+                    consumer_box += "<span style='color: red;'>Mismatch detected! <a href='#' onclick='fetch_discrepancies(\"{consumer}\")'>Check here</a></span><br>"
+                    if f"discrepancies_{consumer}" not in st.session_state:
+                        st.session_state[f"discrepancies_{consumer}"] = False
+
+                    def fetch_discrepancies(consumer_key):
+                        st.session_state[f"discrepancies_{consumer_key}"] = True
                         st.experimental_rerun()
+
+                    if st.session_state[f"discrepancies_{consumer}"]:
+                        st.write("### Unconsumed Events")
+                        st.write(details['discrepancies'])
+                        if st.button("Back", key=f"back_{consumer}"):
+                            st.session_state[f"discrepancies_{consumer}"] = False
+                            st.experimental_rerun()
+
                 consumer_box += "</div>"
                 st.markdown(consumer_box, unsafe_allow_html=True)
             col_index += 1
