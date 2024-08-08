@@ -22,16 +22,31 @@ start_time = st.time_input("Start time")
 end_date = st.date_input("End date")
 end_time = st.time_input("End time")
 
+# Store event counts in session state
 if st.button("Get Event Counts"):
     start = datetime.combine(start_date, start_time)
     end = datetime.combine(end_date, end_time)
     event_counts = get_event_count(start, end)
-    st.session_state.event_counts = event_counts  # Store event counts in session state
+    st.session_state.event_counts = event_counts
+    st.session_state.view = 'main'  # Set view to main
 
+# Check if view is set to discrepancies
+if st.experimental_get_query_params().get("view") == ["discrepancies"]:
+    producer = st.experimental_get_query_params().get("producer", [None])[0]
+    consumer = st.experimental_get_query_params().get("consumer", [None])[0]
+    if producer and consumer and 'event_counts' in st.session_state:
+        discrepancies = st.session_state.event_counts['producers'][producer]['consumedBy'][consumer]['discrepancies']
+        st.header(f"Events not consumed by {consumer}")
+        st.table(discrepancies)
+        if st.button("Back"):
+            st.experimental_set_query_params()
+            st.session_state.view = 'main'
+            st.experimental_rerun()
+else:
     st.write("## Event Counts")
 
     # Iterate through each producer and their consumers
-    for producer, counts in event_counts['producers'].items():
+    for producer, counts in st.session_state.get('event_counts', {}).get('producers', {}).items():
         # Display producer box
         cols = st.columns(2)
         with cols[0]:
@@ -50,19 +65,7 @@ if st.button("Get Event Counts"):
                     <b>Consumed Count:</b> {details['consumedCount']}<br>
                 """
                 if details['discrepancies']:
-                    consumer_box += f"""<span style='color: red;'>Mismatch detected! <a href="?page=discrepancies&producer={producer}&consumer={consumer}">Check here</a></span><br>"""
+                    consumer_box += f"""<span style='color: red;'>Mismatch detected! <a href="#" onclick="window.location.search='?view=discrepancies&producer={producer}&consumer={consumer}'">Check here</a></span><br>"""
                 consumer_box += "</div>"
                 st.markdown(consumer_box, unsafe_allow_html=True)
             col_index += 1
-
-# Feature to display discrepancies
-if st.experimental_get_query_params().get("page") == ["discrepancies"]:
-    producer = st.experimental_get_query_params().get("producer", [None])[0]
-    consumer = st.experimental_get_query_params().get("consumer", [None])[0]
-    if producer and consumer and 'event_counts' in st.session_state:
-        discrepancies = st.session_state.event_counts['producers'][producer]['consumedBy'][consumer]['discrepancies']
-        st.header(f"Events not consumed by {consumer}")
-        st.table(discrepancies)
-        if st.button("Back"):
-            st.experimental_set_query_params()
-            st.experimental_rerun()
