@@ -1,96 +1,31 @@
 import streamlit as st
-import requests
-from datetime import datetime
+import streamlit.components.v1 as components
 
-# Helper function to get event counts
-def get_event_count(start, end):
-    url = "http://localhost:5000/events/date-range"
-    payload = {
-        "start_date": start.isoformat(),
-        "end_date": end.isoformat()
-    }
-    response = requests.post(url, json=payload)
-    return response.json()
+# Define a function that will be triggered
+def my_function():
+    st.write("Button was clicked! Function executed.")
 
-# Initialize session state for navigation
-if 'view' not in st.session_state:
-    st.session_state.view = 'main'
-if 'discrepancies' not in st.session_state:
-    st.session_state.discrepancies = []
-if 'producer' not in st.session_state:
-    st.session_state.producer = ''
-if 'consumer' not in st.session_state:
-    st.session_state.consumer = ''
+# Initialize a session state variable to track the button click
+if 'button_clicked' not in st.session_state:
+    st.session_state.button_clicked = False
 
-# Function to show discrepancies view
-def show_discrepancies(producer, consumer, discrepancies):
-    st.session_state.view = 'discrepancies'
-    st.session_state.producer = producer
-    st.session_state.consumer = consumer
-    st.session_state.discrepancies = discrepancies
-
-# Set up the Streamlit sidebar
-st.sidebar.title("Event Status Visualization")
-
-# Feature 1: Search by Date and Time
-st.header("Search by Date and Time")
-start_date = st.date_input("Start date")
-start_time = st.time_input("Start time")
-end_date = st.date_input("End date")
-end_time = st.time_input("End time")
-
-if st.button("Get Event Counts"):
-    start = datetime.combine(start_date, start_time)
-    end = datetime.combine(end_date, end_time)
-    event_counts = get_event_count(start, end)
-    st.session_state.event_counts = event_counts
-    st.session_state.view = 'main'
-
-if st.session_state.view == 'main':
-    if 'event_counts' in st.session_state:
-        st.write("## Event Counts")
-        # Iterate through each producer and their consumers
-        for producer, counts in st.session_state.event_counts['producers'].items():
-            # Display producer box
-            cols = st.columns(2)
-            with cols[0]:
-                st.markdown(f"<div style='padding: 20px; background-color: lightgray; border-radius: 5px; width: 300px; height: 150px;'><b>Produced by {producer}</b><br><b>Produced Count:</b> {counts['producedCount']}</div>", unsafe_allow_html=True)
-
-            # Display each consumer in a new line under the producer
-            col_index = 1
-            for consumer, details in counts['consumedBy'].items():
-                if col_index == 2:
-                    cols = st.columns(2)
-                    col_index = 0
-                with cols[col_index]:
-                    consumer_box = f"""
-                    <div style='padding: 20px; background-color: lightblue; border-radius: 5px; width: 300px; height: auto; margin-top: 10px;'>
-                        <h4 style='text-align: center;'>{consumer}</h4>
-                        <b>Consumed Count:</b> {details['consumedCount']}<br>
-                    """
-                    if details['discrepancies']:
-                        consumer_box += f"""<span style='color: red;'>Mismatch detected! </span><br>"""
-                        consumer_box += f"""<a href="#" onClick="window.show_discrepancies('{producer}', '{consumer}', {details['discrepancies']})" style="color: blue; text-decoration: underline;">Check here</a><br>"""
-                    consumer_box += "</div>"
-                    st.markdown(consumer_box, unsafe_allow_html=True)
-                col_index += 1
-
-    # Register JavaScript function to handle discrepancy display
-    st.markdown("""
-        <script>
-        window.show_discrepancies = function(producer, consumer, discrepancies) {
-            window.location.href = "#";
-            // Use Streamlit's Session State API to switch views
-            window.show_discrepancies_producer = producer;
-            window.show_discrepancies_consumer = consumer;
-            window.show_discrepancies_data = discrepancies;
-            Streamlit.setComponentValue({});
+# Create the HTML button
+button_html = """
+    <button onclick="trigger_function()">Click Me!</button>
+    <script>
+        function trigger_function() {
+            // Communicate with Streamlit via session state
+            var python_code = 'st.session_state.button_clicked = True';
+            streamlit_run(python_code);
         }
-        </script>
-    """, unsafe_allow_html=True)
+    </script>
+"""
 
-elif st.session_state.view == 'discrepancies':
-    st.header(f"Events not consumed by {st.session_state.consumer}")
-    st.table(st.session_state.discrepancies)
-    if st.button("Back"):
-        st.session_state.view = 'main'
+# Render the HTML button in the Streamlit app
+components.html(button_html)
+
+# Check if the button was clicked and trigger the Python function
+if st.session_state.button_clicked:
+    my_function()
+    # Reset the session state after the function is triggered
+    st.session_state.button_clicked = False
