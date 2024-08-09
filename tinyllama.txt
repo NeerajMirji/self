@@ -1,35 +1,19 @@
 import streamlit as st
-import streamlit.components.v1 as components
 
-# Function to execute when button is clicked
-def my_function():
-    st.write("Button was clicked! Function executed.")
+# Apply CSS to center the button
+st.markdown(
+    """
+    <style>
+    .stButton > button {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-# Initialize session state if it doesn't exist
-if 'button_clicked' not in st.session_state:
-    st.session_state.button_clicked = False
-
-# JavaScript to trigger a hidden Streamlit form
-button_html = """
-    <button onclick="document.getElementById('hidden_form').submit()">Click Me!</button>
-    <form id="hidden_form">
-        <input type="hidden" name="trigger" value="true" />
-    </form>
-    <script>
-        document.getElementById('hidden_form').onsubmit = function() {
-            console.log("Button was clicked! Form submitted.");
-        };
-    </script>
-"""
-
-# Embed the HTML button in the Streamlit app
-components.html(button_html)
-
-# Check if the form was submitted and trigger the function
-if st.session_state.button_clicked or st.experimental_get_query_params().get('trigger'):
-    my_function()
-    st.session_state.button_clicked = False
-
-# Allow users to reset the button click state
-if st.button('Reset'):
-    st.session_state.button_clicked = False
+# Create a centered button
+if st.button('Centered Button'):
+    st.write("Button clicked!")
