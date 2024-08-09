@@ -1,31 +1,35 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Define a function that will be triggered
+# Function to execute when button is clicked
 def my_function():
     st.write("Button was clicked! Function executed.")
 
-# Initialize a session state variable to track the button click
+# Initialize session state if it doesn't exist
 if 'button_clicked' not in st.session_state:
     st.session_state.button_clicked = False
 
-# Create the HTML button
+# HTML button that uses JavaScript to trigger a Python action
 button_html = """
-    <button onclick="trigger_function()">Click Me!</button>
+    <button onclick="triggerPythonFunction()">Click Me!</button>
     <script>
-        function trigger_function() {
-            // Communicate with Streamlit via session state
-            var python_code = 'st.session_state.button_clicked = True';
-            streamlit_run(python_code);
+        function triggerPythonFunction() {
+            // Update the session state and reload the page
+            window.location.href = window.location.href + "?button_clicked=true";
         }
     </script>
 """
 
-# Render the HTML button in the Streamlit app
+# Embed the HTML button in the Streamlit app
 components.html(button_html)
 
-# Check if the button was clicked and trigger the Python function
+# Check if the button was clicked using query parameters
+if st.experimental_get_query_params().get('button_clicked'):
+    st.session_state.button_clicked = True
+    st.experimental_rerun()  # Reload the page to apply session state changes
+
+# Trigger the function if the button was clicked
 if st.session_state.button_clicked:
     my_function()
-    # Reset the session state after the function is triggered
+    # Optionally reset the session state to allow clicking again
     st.session_state.button_clicked = False
