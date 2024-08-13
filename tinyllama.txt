@@ -1,8 +1,8 @@
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+
+import java.time.LocalDateTime;
+import java.util.*;
 
 @Service
 public class EventAcknowledgementService {
@@ -10,97 +10,45 @@ public class EventAcknowledgementService {
     @Autowired
     private EventAcknowledgementRepository repository;
 
-    // Save producer acknowledgment
-    public void saveProducerAck(String evtId, String ackFrom, String publisherApp, String publishedAt, List<String> publishedTo) {
-        EventAcknowledgement eventAck = repository.findById(evtId);
-        if (eventAck == null) {
-            eventAck = new EventAcknowledgement();
-            eventAck.setId(evtId);
-            eventAck.setEventFlow(new ArrayList<>());
-        }
+    public Map<String, Object> getEventSummary(LocalDateTime startDate, LocalDateTime endDate) {
+        List<EventAcknowledgement> events = repository.findAllByPublishedAtBetween(startDate, endDate);
 
-        // Find the existing producer details
-        Optional<ProducerDetails> producerDetailsOpt = eventAck.getEventFlow().stream()
-                .filter(producer -> producer.getPublisherApp().equals(publisherApp) && producer.getPublishedAt().equals(publishedAt))
-                .findFirst();
+        Map<String, Map<String, Object>> producersMap = new LinkedHashMap<>();
 
-        ProducerDetails producerDetails;
+        for (EventAcknowledgement event : events) {
+            // Sort the eventFlow by publishedAt before processing
+            event.getEventFlow().sort(Comparator.comparing(ProducerDetails::getPublishedAt));
 
-        if (producerDetailsOpt.isPresent()) {
-            producerDetails = producerDetailsOpt.get();
-            // Add missing consumer details from producerAck
-            for (String consumerApp : publishedTo) {
-                if (producerDetails.getPublishedTo().stream().noneMatch(consumer -> consumer.getConsumerApp().equals(consumerApp))) {
-                    ConsumerDetails consumerDetails = new ConsumerDetails();
-                    consumerDetails.setConsumerApp(consumerApp);
-                    consumerDetails.setStatus("Pending"); // Default status
-                    producerDetails.getPublishedTo().add(consumerDetails);
+            for (ProducerDetails producer : event.getEventFlow()) {
+                String producerApp = producer.getPublisherApp();
+
+                producersMap.putIfAbsent(producerApp, new HashMap<>());
+                Map<String, Object> producerData = producersMap.get(producerApp);
+                producerData.put("producedCount", ((int) producerData.getOrDefault("producedCount", 0)) + 1);
+
+                Map<String, Map<String, Object>> consumedByMap = (Map<String, Map<String, Object>>) producerData.getOrDefault("consumedBy", new HashMap<>());
+                producerData.put("consumedBy", consumedByMap);
+
+                for (ConsumerDetails consumer : producer.getPublishedTo()) {
+                    String consumerApp = consumer.getConsumerApp();
+
+                    consumedByMap.putIfAbsent(consumerApp, new HashMap<>());
+                    Map<String, Object> consumerData = consumedByMap.get(consumerApp);
+                    consumerData.put("consumedCount", ((int) consumerData.getOrDefault("consumedCount", 0)) + 1);
+
+                    List<String> discrepancies = (List<String>) consumerData.getOrDefault("discrepancies", new ArrayList<>());
+                    if (!consumer.getStatus().equals("SUCCESS")) {
+                        discrepancies.add(event.getId()); // Assuming the event ID is the identifier for discrepancies
+                    }
+                    consumerData.put("discrepancies", discrepancies);
                 }
             }
-        } else {
-            producerDetails = new ProducerDetails();
-            producerDetails.setPublisherApp(publisherApp);
-            producerDetails.setPublishedAt(publishedAt);
-
-            List<ConsumerDetails> consumerDetailsList = new ArrayList<>();
-            for (String consumerApp : publishedTo) {
-                ConsumerDetails consumerDetails = new ConsumerDetails();
-                consumerDetails.setConsumerApp(consumerApp);
-                consumerDetails.setStatus("Pending"); // Default status as pending
-                consumerDetailsList.add(consumerDetails);
-            }
-
-            producerDetails.setPublishedTo(consumerDetailsList);
-            eventAck.getEventFlow().add(producerDetails);
         }
 
-        repository.save(eventAck);
-    }
+        // Convert LinkedHashMap to maintain the insertion order which is based on sorted publishedAt
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("producers", producersMap);
 
-    // Process consumer acknowledgment
-    public void processConsumerAck(String evtId, String ackFrom, String consumerApp, String publisherApp, String consumedAt, String publishedAt) {
-        EventAcknowledgement eventAck = repository.findById(evtId);
-
-        if (eventAck == null) {
-            eventAck = new EventAcknowledgement();
-            eventAck.setId(evtId);
-            eventAck.setEventFlow(new ArrayList<>());
-        }
-
-        Optional<ProducerDetails> producerDetailsOpt = eventAck.getEventFlow().stream()
-                .filter(producer -> producer.getPublisherApp().equals(publisherApp) && producer.getPublishedAt().equals(publishedAt))
-                .findFirst();
-
-        ProducerDetails producerDetails;
-
-        if (producerDetailsOpt.isPresent()) {
-            producerDetails = producerDetailsOpt.get();
-        } else {
-            // Create a new producerDetails if it doesn't exist
-            producerDetails = new ProducerDetails();
-            producerDetails.setPublisherApp(publisherApp);
-            producerDetails.setPublishedAt(publishedAt);
-            producerDetails.setPublishedTo(new ArrayList<>());
-            eventAck.getEventFlow().add(producerDetails);
-        }
-
-        // Update or add the consumer details
-        Optional<ConsumerDetails> consumerDetailsOpt = producerDetails.getPublishedTo().stream()
-                .filter(consumer -> consumer.getConsumerApp().equals(consumerApp))
-                .findFirst();
-
-        if (consumerDetailsOpt.isPresent()) {
-            ConsumerDetails consumerDetails = consumerDetailsOpt.get();
-            consumerDetails.setStatus("SUCCESS");
-            consumerDetails.setConsumedAt(consumedAt);
-        } else {
-            ConsumerDetails newConsumerDetails = new ConsumerDetails();
-            newConsumerDetails.setConsumerApp(consumerApp);
-            newConsumerDetails.setStatus("SUCCESS");
-            newConsumerDetails.setConsumedAt(consumedAt);
-            producerDetails.getPublishedTo().add(newConsumerDetails);
-        }
-
-        repository.save(eventAck);
+        return response;
     }
 }
