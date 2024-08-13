@@ -1,19 +1,106 @@
-import streamlit as st
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
-# Apply CSS to center the button
-st.markdown(
-    """
-    <style>
-    .stButton > button {
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
+@Service
+public class EventAcknowledgementService {
+
+    @Autowired
+    private EventAcknowledgementRepository repository;
+
+    // Save producer acknowledgment
+    public void saveProducerAck(String evtId, String ackFrom, String publisherApp, String publishedAt, List<String> publishedTo) {
+        EventAcknowledgement eventAck = repository.findById(evtId);
+        if (eventAck == null) {
+            eventAck = new EventAcknowledgement();
+            eventAck.setId(evtId);
+            eventAck.setEventFlow(new ArrayList<>());
+        }
+
+        // Find the existing producer details
+        Optional<ProducerDetails> producerDetailsOpt = eventAck.getEventFlow().stream()
+                .filter(producer -> producer.getPublisherApp().equals(publisherApp) && producer.getPublishedAt().equals(publishedAt))
+                .findFirst();
+
+        ProducerDetails producerDetails;
+
+        if (producerDetailsOpt.isPresent()) {
+            producerDetails = producerDetailsOpt.get();
+            // Add missing consumer details from producerAck
+            for (String consumerApp : publishedTo) {
+                if (producerDetails.getPublishedTo().stream().noneMatch(consumer -> consumer.getConsumerApp().equals(consumerApp))) {
+                    ConsumerDetails consumerDetails = new ConsumerDetails();
+                    consumerDetails.setConsumerApp(consumerApp);
+                    consumerDetails.setStatus("Pending"); // Default status
+                    producerDetails.getPublishedTo().add(consumerDetails);
+                }
+            }
+        } else {
+            producerDetails = new ProducerDetails();
+            producerDetails.setPublisherApp(publisherApp);
+            producerDetails.setPublishedAt(publishedAt);
+
+            List<ConsumerDetails> consumerDetailsList = new ArrayList<>();
+            for (String consumerApp : publishedTo) {
+                ConsumerDetails consumerDetails = new ConsumerDetails();
+                consumerDetails.setConsumerApp(consumerApp);
+                consumerDetails.setStatus("Pending"); // Default status as pending
+                consumerDetailsList.add(consumerDetails);
+            }
+
+            producerDetails.setPublishedTo(consumerDetailsList);
+            eventAck.getEventFlow().add(producerDetails);
+        }
+
+        repository.save(eventAck);
     }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
-# Create a centered button
-if st.button('Centered Button'):
-    st.write("Button clicked!")
+    // Process consumer acknowledgment
+    public void processConsumerAck(String evtId, String ackFrom, String consumerApp, String publisherApp, String consumedAt, String publishedAt) {
+        EventAcknowledgement eventAck = repository.findById(evtId);
+
+        if (eventAck == null) {
+            eventAck = new EventAcknowledgement();
+            eventAck.setId(evtId);
+            eventAck.setEventFlow(new ArrayList<>());
+        }
+
+        Optional<ProducerDetails> producerDetailsOpt = eventAck.getEventFlow().stream()
+                .filter(producer -> producer.getPublisherApp().equals(publisherApp) && producer.getPublishedAt().equals(publishedAt))
+                .findFirst();
+
+        ProducerDetails producerDetails;
+
+        if (producerDetailsOpt.isPresent()) {
+            producerDetails = producerDetailsOpt.get();
+        } else {
+            // Create a new producerDetails if it doesn't exist
+            producerDetails = new ProducerDetails();
+            producerDetails.setPublisherApp(publisherApp);
+            producerDetails.setPublishedAt(publishedAt);
+            producerDetails.setPublishedTo(new ArrayList<>());
+            eventAck.getEventFlow().add(producerDetails);
+        }
+
+        // Update or add the consumer details
+        Optional<ConsumerDetails> consumerDetailsOpt = producerDetails.getPublishedTo().stream()
+                .filter(consumer -> consumer.getConsumerApp().equals(consumerApp))
+                .findFirst();
+
+        if (consumerDetailsOpt.isPresent()) {
+            ConsumerDetails consumerDetails = consumerDetailsOpt.get();
+            consumerDetails.setStatus("SUCCESS");
+            consumerDetails.setConsumedAt(consumedAt);
+        } else {
+            ConsumerDetails newConsumerDetails = new ConsumerDetails();
+            newConsumerDetails.setConsumerApp(consumerApp);
+            newConsumerDetails.setStatus("SUCCESS");
+            newConsumerDetails.setConsumedAt(consumedAt);
+            producerDetails.getPublishedTo().add(newConsumerDetails);
+        }
+
+        repository.save(eventAck);
+    }
+}
