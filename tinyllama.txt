@@ -1,1 +1,26 @@
+Resiliency : If consumers miss an event, they have the ability to identify the missed data and request the producer to resend it. This reduces the risk of data loss and ensures that all events are accounted for, which is crucial for maintaining accurate transaction records in a banking environment.
+
+Centralised : One stop solution for all apps regarding Event Tracking.
+
+Consumer Lag : Consumers can monitor their lag.
+
 Saving Time: The app automatically checks that events are correctly produced and consumed, so people don’t have to do it manually. This saves time and reduces the chance of mistakes.
+
+Alert Consumer App : We can alert consumers when the lag increases, so that they can proactively address any potential issues before they become bigger problems. This ensures that transactions are processed smoothly and efficiently.
+
+
+Data Integrity: Ensuring that every transaction event is processed correctly is critical in a banking environment. The reconciliation app helps verify that all produced events are consumed, maintaining the integrity of financial data across multiple systems.
+
+Real-time Monitoring and Alerts: The app enables real-time monitoring of event flow. If there’s a delay or discrepancy in consumption, the system can immediately alert consumers, allowing them to investigate and resolve issues promptly, reducing the risk of prolonged outages.
+
+Enhanced Resiliency: By tracking which events have been missed, the app helps in quickly identifying and resolving issues. Consumers can request the producer to resend missing events, ensuring that no critical data is lost.
+
+Accountability and Auditing: The reconciliation app provides a clear audit trail of all transaction events. This is crucial for regulatory compliance in the banking industry, where accurate record-keeping is mandatory.
+
+Performance Insights: The app provides insights into the performance of both producers and consumers. If certain consumers are lagging, it becomes easier to identify and address bottlenecks, improving the overall system performance.
+
+Minimized Manual Intervention: Automating the reconciliation process reduces the need for manual checks and interventions, freeing up resources and reducing the potential for human error.
+
+Proactive Error Handling: By detecting discrepancies early, the app allows for proactive error handling, which can prevent minor issues from escalating into larger problems that could impact customer transactions.
+
+
