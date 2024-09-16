@@ -1,17 +1,4 @@
-Here’s how you can address the concern about the overhead of sending acknowledgments for each event:
-
-Asynchronous Acknowledgments: Acknowledgments can be sent asynchronously, minimizing the impact on the main flow of event processing. This way, the producer or consumer can continue their primary tasks without waiting for the acknowledgment process to complete.
-
-Batch Acknowledgments: Instead of sending an acknowledgment for every single event, acknowledgments can be batched. For example, after a certain number of events or at specific intervals, a single acknowledgment is sent for all events processed during that period. This reduces the frequency of acknowledgment messages and minimizes overhead.
-
-Event Interceptors: Implementing interceptors within the producer and consumer applications can handle the acknowledgment process in the background, ensuring that the main workflow is not disrupted. This method ensures that acknowledgments are sent without directly impacting the event processing pipeline.
-
-Optimized Kafka Configurations: Kafka itself can be optimized to handle the additional load of acknowledgments. Configurations such as adjusting the acks parameter, tweaking producer/consumer buffer sizes, or leveraging Kafka Streams for more efficient processing can help mitigate performance impacts.
-
-Selective Acknowledgments: Not every event may require an acknowledgment. Critical events can be prioritized for acknowledgment, while less important ones may not need this level of confirmation. This reduces the total number of acknowledgments that need to be sent.
-
-Scalability Considerations: The system can be designed to scale horizontally, ensuring that any additional load caused by sending acknowledgments does not affect performance. By adding more instances of consumers or producers, the load is distributed, mitigating the impact.
-
-Long-term Benefits: While there may be a slight overhead, the long-term benefits—such as increased reliability, better error handling, and improved data integrity—far outweigh the short-term performance costs. Ensuring that every event is accounted for is crucial, especially in a banking environment where errors can be costly.
-
-These strategies aim to address the performance concerns while ensuring that the reconciliation process remains robust and reliable.
+testImplementation 'org.powermock:powermock-module-junit4:2.0.9'
+testImplementation 'org.powermock:powermock-api-mockito2:2.0.9'
+testImplementation 'org.mockito:mockito-core:4.0.0'
+testImplementation 'junit:junit:4.13.2'
