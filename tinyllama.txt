@@ -2,3 +2,64 @@ testImplementation 'org.powermock:powermock-module-junit4:2.0.9'
 testImplementation 'org.powermock:powermock-api-mockito2:2.0.9'
 testImplementation 'org.mockito:mockito-core:4.0.0'
 testImplementation 'junit:junit:4.13.2'
+
+
+
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
+import org.junit.runner.RunWith;
+
+// Run with PowerMockRunner
+@RunWith(PowerMockRunner.class)
+@PrepareForTest(ReportController.class) // Prepare the class that calls the constructor
+public class ReportControllerTest {
+
+    @InjectMocks
+    private ReportController reportController; // Assuming your controller name is ReportController
+
+    @Mock
+    private RunReportService runReportService;
+
+    @Mock
+    private HttpSession session;
+
+    private MockHttpServletRequest request;
+    private MockHttpServletResponse response;
+
+    @Before
+    public void setup() {
+        request = new MockHttpServletRequest();
+        response = new MockHttpServletResponse();
+    }
+
+    @Test
+    public void testRunDetailedReport_SessionExistsException() throws Exception {
+        // Arrange: Set up the request params
+        Map<String, String> requestParams = new HashMap<>();
+        requestParams.put("companyId", "12345");
+        requestParams.put("userId", "67890");
+
+        // Use PowerMockito to mock the constructor of the Session class
+        PowerMockito.whenNew(Session.class)
+                    .withArguments(anyString(), anyString(), anyBoolean())
+                    .thenThrow(new SessionExistsException("Session already exists"));
+
+        // Act & Assert: Expect the RunReportException due to SessionExistsException
+        Exception exception = assertThrows(RunReportException.class, () -> {
+            reportController.runDetailedReport(request, response, requestParams);
+        });
+
+        // Assert that the exception message is as expected
+        assertTrue(exception.getMessage().contains("Failed to initialize TIR Session"));
+
+        // Verify that the runReportService was never called
+        verify(runReportService, never()).runDetailedReport(any(), any(), any());
+    }
+}
