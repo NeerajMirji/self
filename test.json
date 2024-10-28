@@ -1,67 +1,37 @@
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import splunklib.client as client
+import splunklib.results as results
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+# Replace with your Splunk credentials and host details
+HOST = 'your_splunk_host'
+PORT = 8089  # Management port for Splunk (default is 8089)
+USERNAME = 'your_username'
+PASSWORD = 'your_password'
+QUERY = 'search your_search_query_here'  # Replace with your actual query
 
-@RestController
-@RequestMapping("/api/events")
-public class EventController {
+# Establish a connection to Splunk
+service = client.connect(
+    host=HOST,
+    port=PORT,
+    username=USERNAME,
+    password=PASSWORD
+)
 
-    @GetMapping("/test")
-    public ResponseEntity<Map<String, Object>> getTestEventResponse() {
-        // Create the JSON structure
-        Map<String, Object> response = new HashMap<>();
-        
-        Map<String, Object> producers = new HashMap<>();
-        
-        // Create ODS producer details
-        Map<String, Object> odsDetails = new HashMap<>();
-        odsDetails.put("producedCount", 100);
-        
-        Map<String, Object> odsConsumedBy = new HashMap<>();
-        
-        // IRWS consumer details
-        Map<String, Object> irwsDetails = new HashMap<>();
-        irwsDetails.put("consumedCount", 95);
-        irwsDetails.put("discrepancies", List.of("event1", "event2"));
-        odsConsumedBy.put("IRWS", irwsDetails);
-        
-        // AnotherConsumer details
-        Map<String, Object> anotherConsumerDetails = new HashMap<>();
-        anotherConsumerDetails.put("consumedCount", 98);
-        anotherConsumerDetails.put("discrepancies", List.of());
-        odsConsumedBy.put("AnotherConsumer", anotherConsumerDetails);
-        
-        odsDetails.put("consumedBy", odsConsumedBy);
-        producers.put("ODS", odsDetails);
-        
-        // AnotherProducer details
-        Map<String, Object> anotherProducerDetails = new HashMap<>();
-        anotherProducerDetails.put("producedCount", 80);
-        
-        Map<String, Object> anotherProducerConsumedBy = new HashMap<>();
-        
-        // SomeConsumer details
-        Map<String, Object> someConsumerDetails = new HashMap<>();
-        someConsumerDetails.put("consumedCount", 75);
-        someConsumerDetails.put("discrepancies", List.of("event3"));
-        anotherProducerConsumedBy.put("SomeConsumer", someConsumerDetails);
-        
-        // AnotherConsumer details for AnotherProducer
-        anotherConsumerDetails = new HashMap<>();
-        anotherConsumerDetails.put("consumedCount", 77);
-        anotherConsumerDetails.put("discrepancies", List.of());
-        anotherProducerConsumedBy.put("AnotherConsumer", anotherConsumerDetails);
-        
-        anotherProducerDetails.put("consumedBy", anotherProducerConsumedBy);
-        producers.put("AnotherProducer", anotherProducerDetails);
-        
-        response.put("producers", producers);
-        
-        return ResponseEntity.ok(response);
-    }
-}
+# Create a new search job
+job = service.jobs.create(QUERY)
+
+# Wait for the job to complete (optional)
+while not job.is_done():
+    pass
+
+# Get the results from the search job
+results_reader = results.ResultsReader(job.results())
+
+# Process the search results
+for result in results_reader:
+    if isinstance(result, dict):
+        print(result)  # Print each result row as a dictionary
+    elif isinstance(result, results.Message):
+        print(f"Message: {result.message}")
+
+# Final cleanup
+job.cancel()  # Optionally cancel the job if no longer needed
